@@ -1,0 +1,6 @@
+- name: Deploy paasible
+  hosts: paasible_hosts
+  become: true
+  roles:
+    - role: paasible
+      paasible_stacks_dir: "{{ playbook_dir }}/../stacks"

@@ -1,0 +1,3 @@
+paasible_subdomain_root: example.com
+paasible_tls_resolver: cloudflare
+paasible_acme_email: admin@example.com

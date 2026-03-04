@@ -1,0 +1,37 @@
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+
+entryPoints:
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
+  websecure:
+    address: ":443"
+
+providers:
+  docker:
+    exposedByDefault: false
+    network: traefik
+  file:
+    directory: /dynamic
+    watch: true
+
+certificatesResolvers:
+  {{ paasible_tls_resolver }}:
+    acme:
+      email: "{{ paasible_acme_email }}"
+      storage: /certs/acme.json
+      dnsChallenge:
+        provider: cloudflare
+        resolvers:
+          - "1.1.1.1:53"
+          - "1.0.0.1:53"
+
+api:
+  dashboard: true

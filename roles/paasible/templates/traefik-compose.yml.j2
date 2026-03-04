@@ -1,0 +1,37 @@
+services:
+  traefik:
+    image: traefik:v3.0
+    container_name: traefik
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - traefik
+    ports:
+      - "80:80"
+      - "443:443"
+      - "127.0.0.1:8080:8080"
+    environment:
+      - CF_DNS_API_TOKEN
+      - CF_API_EMAIL
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik-certs:/certs
+      - ./traefik.yml:/traefik.yml:ro
+      - ./dynamic:/dynamic:ro
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.dashboard.rule=Host(`{{ paasible_traefik_dashboard_host }}`)"
+      - "traefik.http.routers.dashboard.entrypoints=websecure"
+      - "traefik.http.routers.dashboard.tls=true"
+      - "traefik.http.routers.dashboard.tls.certresolver={{ paasible_tls_resolver }}"
+      - "traefik.http.routers.dashboard.service=api@internal"
+
+networks:
+  traefik:
+    name: traefik
+    driver: bridge
+
+volumes:
+  traefik-certs:
+    name: traefik-certs

@@ -1,0 +1,11 @@
+paasible_subdomain_root: example.com
+paasible_tls_resolver: cloudflare
+paasible_acme_email: admin@example.com
+paasible_stacks_root: /opt/paasible
+
+paasible_traefik_enabled: true
+paasible_traefik_dashboard_host: "traefik.{{ paasible_subdomain_root }}"
+paasible_traefik_cf_token: ""
+paasible_traefik_cf_email: ""
+
+paasible_stacks: {}

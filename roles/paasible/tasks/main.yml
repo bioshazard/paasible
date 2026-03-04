@@ -1,0 +1,107 @@
+- name: Ensure Traefik directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  loop:
+    - "{{ paasible_stacks_root }}/traefik"
+    - "{{ paasible_stacks_root }}/traefik/dynamic"
+  when: paasible_traefik_enabled | bool
+
+- name: Template Traefik compose
+  ansible.builtin.template:
+    src: traefik-compose.yml.j2
+    dest: "{{ paasible_stacks_root }}/traefik/docker-compose.yml"
+    owner: root
+    group: root
+    mode: '0644'
+  when: paasible_traefik_enabled | bool
+
+- name: Write Traefik .env file
+  ansible.builtin.copy:
+    content: |
+      CF_DNS_API_TOKEN={{ paasible_traefik_cf_token }}
+      CF_API_EMAIL={{ paasible_traefik_cf_email }}
+    dest: "{{ paasible_stacks_root }}/traefik/.env"
+    owner: root
+    group: root
+    mode: '0600'
+  when: paasible_traefik_enabled | bool
+
+- name: Sync Traefik static config
+  ansible.builtin.template:
+    src: traefik.yml.j2
+    dest: "{{ paasible_stacks_root }}/traefik/traefik.yml"
+    mode: '0644'
+  when: paasible_traefik_enabled | bool
+
+- name: Deploy Traefik stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ paasible_stacks_root }}/traefik"
+    files:
+      - docker-compose.yml
+    state: present
+    recreate: "{{ paasible_stack_recreate | default('auto') }}"
+    pull: missing
+  when: paasible_traefik_enabled | bool
+
+- name: Ensure stack directory exists
+  ansible.builtin.file:
+    path: "{{ paasible_stacks_root }}/{{ item.key }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  loop: "{{ paasible_stacks | dict2items }}"
+  when: paasible_stacks | length > 0
+
+- name: Copy user stack compose
+  ansible.builtin.copy:
+    src: "{{ paasible_stacks_dir }}/{{ item.key }}/docker-compose.yml"
+    dest: "{{ paasible_stacks_root }}/{{ item.key }}/docker-compose.yml"
+    owner: root
+    group: root
+    mode: '0644'
+  loop: "{{ paasible_stacks | dict2items }}"
+  when: paasible_stacks | length > 0
+
+- name: Generate Traefik labels overlay
+  ansible.builtin.template:
+    src: labels.yml.j2
+    dest: "{{ paasible_stacks_root }}/{{ item.key }}/labels.yml"
+    mode: '0644'
+  vars:
+    stack_name: "{{ item.key }}"
+    stack: "{{ item.value }}"
+    stack_dir: "{{ paasible_stacks_dir }}/{{ item.key }}"
+  loop: "{{ paasible_stacks | dict2items }}"
+  when: paasible_stacks | length > 0
+
+- name: Write .env file from stack env vars
+  ansible.builtin.copy:
+    content: |
+      {% for key, value in item.value.env.items() %}
+      {{ key }}={{ value }}
+      {% endfor %}
+    dest: "{{ paasible_stacks_root }}/{{ item.key }}/.env"
+    owner: root
+    group: root
+    mode: '0600'
+  loop: "{{ paasible_stacks | dict2items }}"
+  when: paasible_stacks | length > 0 and item.value.env is defined
+
+- name: Deploy user stacks
+  community.docker.docker_compose_v2:
+    project_src: "{{ paasible_stacks_root }}/{{ item.key }}"
+    files:
+      - docker-compose.yml
+      - labels.yml
+    state: present
+    recreate: "{{ paasible_stack_recreate | default('auto') }}"
+    pull: missing
+  loop: "{{ paasible_stacks | dict2items }}"
+  when: paasible_stacks | length > 0
+  tags:
+    - app
