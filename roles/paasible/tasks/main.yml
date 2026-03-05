@@ -1,3 +1,44 @@
+- name: Find managed stack markers
+  ansible.builtin.find:
+    paths: "{{ paasible_stacks_root }}"
+    patterns: ".paasible-stack"
+    file_type: file
+    hidden: true
+    recurse: true
+  register: paasible_markers
+  failed_when: false
+
+- name: Stop removed stacks
+  community.docker.docker_compose_v2:
+    project_src: "{{ item | dirname }}"
+    state: absent
+  loop: >-
+    {{
+      paasible_markers.files
+      | map(attribute='path')
+      | reject('search', '/traefik/')
+      | list
+    }}
+  when:
+    - paasible_markers.files | length > 0
+    - (item | dirname | basename) not in paasible_stacks.keys()
+  failed_when: false
+
+- name: Remove removed stack directories
+  ansible.builtin.file:
+    path: "{{ item | dirname }}"
+    state: absent
+  loop: >-
+    {{
+      paasible_markers.files
+      | map(attribute='path')
+      | reject('search', '/traefik/')
+      | list
+    }}
+  when:
+    - paasible_markers.files | length > 0
+    - (item | dirname | basename) not in paasible_stacks.keys()
+
 - name: Ensure Traefik directories exist
   ansible.builtin.file:
     path: "{{ item }}"
@@ -23,7 +64,6 @@
   ansible.builtin.copy:
     content: |
       CF_DNS_API_TOKEN={{ paasible_traefik_cf_token }}
-      CF_API_EMAIL={{ paasible_traefik_cf_email }}
     dest: "{{ paasible_stacks_root }}/traefik/.env"
     owner: root
     group: root
@@ -90,7 +130,7 @@
     group: root
     mode: '0600'
   loop: "{{ paasible_stacks | dict2items }}"
-  when: paasible_stacks | length > 0 and item.value.env is defined
+  when: paasible_stacks | length > 0 and item.value.env is defined and item.value.env | length > 0
 
 - name: Deploy user stacks
   community.docker.docker_compose_v2:
@@ -105,3 +145,11 @@
   when: paasible_stacks | length > 0
   tags:
     - app
+
+- name: Write stack marker
+  ansible.builtin.copy:
+    dest: "{{ paasible_stacks_root }}/{{ item.key }}/.paasible-stack"
+    content: "{{ item.key }}"
+    mode: '0644'
+  loop: "{{ paasible_stacks | dict2items }}"
+  when: paasible_stacks | length > 0

@@ -3,15 +3,16 @@ services:
 {% for svc_name, svc in base.services.items() %}
 {% if svc['x-paasible'] is defined %}
 {% set p = svc['x-paasible'] %}
-{% set routes = p.routes if p.routes is defined else [{'port': p.port, 'host': p.host | default(svc_name ~ '.' ~ paasible_subdomain_root)}] %}
+{% set routes = p.routes if p.routes is defined else [{'port': p.port, 'host': p.host | default(p.subdomain ~ '.' ~ paasible_subdomain_root if p.subdomain is defined else svc_name ~ '.' ~ paasible_subdomain_root)}] %}
   {{ svc_name }}:
     labels:
       - "traefik.enable=true"
 {% for route in routes %}
-{% set host = route.host | default(svc_name ~ '.' ~ paasible_subdomain_root) %}
+{% set host = route.host | default(route.subdomain ~ '.' ~ paasible_subdomain_root if route.subdomain is defined else svc_name ~ '.' ~ paasible_subdomain_root) %}
 {% set r = stack_name ~ '-' ~ svc_name ~ '-' ~ route.port %}
       - "traefik.http.routers.{{ r }}.entrypoints=websecure"
       - "traefik.http.routers.{{ r }}.rule=Host(`{{ host }}`)"
+      - "traefik.http.routers.{{ r }}.service={{ r }}@docker"
       - "traefik.http.routers.{{ r }}.tls=true"
       - "traefik.http.routers.{{ r }}.tls.certresolver={{ paasible_tls_resolver }}"
       - "traefik.http.services.{{ r }}.loadbalancer.server.port={{ route.port }}"

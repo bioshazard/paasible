@@ -6,6 +6,6 @@ paasible_stacks_root: /opt/paasible
 paasible_traefik_enabled: true
 paasible_traefik_dashboard_host: "traefik.{{ paasible_subdomain_root }}"
 paasible_traefik_cf_token: ""
-paasible_traefik_cf_email: ""
+paasible_traefik_version: "v3.6.6"
 
 paasible_stacks: {}
