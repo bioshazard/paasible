@@ -1,12 +1,23 @@
 {%- set base = lookup('file', stack_dir ~ '/docker-compose.yml') | from_yaml -%}
+{%- set ext_nets = stack.external_networks | default([]) -%}
+{%- set x_paasible_svcs = base.services | dict2items | selectattr('value.x-paasible', 'defined') | list -%}
+{%- set has_x_paasible = (x_paasible_svcs | length) > 0 -%}
 services:
 {% for svc_name, svc in base.services.items() %}
 {% if svc['x-paasible'] is defined %}
 {% set p = svc['x-paasible'] %}
 {% set routes = p.routes if p.routes is defined else [{'port': p.port, 'host': p.host | default(p.subdomain ~ '.' ~ paasible_subdomain_root if p.subdomain is defined else svc_name ~ '.' ~ paasible_subdomain_root)}] %}
   {{ svc_name }}:
+    networks:
+      {{ stack_name }}-net: {}
+{% for ext_net in ext_nets %}
+      {{ ext_net }}:
+        aliases:
+          - {{ stack_name }}-{{ svc_name }}
+{% endfor %}
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.network={{ stack_name }}-net"
 {% for route in routes %}
 {% set host = route.host | default(route.subdomain ~ '.' ~ paasible_subdomain_root if route.subdomain is defined else svc_name ~ '.' ~ paasible_subdomain_root) %}
 {% set r = stack_name ~ '-' ~ svc_name ~ '-' ~ route.port %}
@@ -17,5 +28,22 @@ services:
       - "traefik.http.routers.{{ r }}.tls.certresolver={{ paasible_tls_resolver }}"
       - "traefik.http.services.{{ r }}.loadbalancer.server.port={{ route.port }}"
 {% endfor %}
+{% else %}
+  {{ svc_name }}:
+    networks:
+      {{ stack_name }}-net: {}
+{% for ext_net in ext_nets %}
+      {{ ext_net }}:
+        aliases:
+          - {{ stack_name }}-{{ svc_name }}
+{% endfor %}
 {% endif %}
+{% endfor %}
+
+networks:
+  {{ stack_name }}-net:
+    external: true
+{% for ext_net in ext_nets %}
+  {{ ext_net }}:
+    external: true
 {% endfor %}

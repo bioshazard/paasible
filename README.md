@@ -63,12 +63,6 @@ services:
     x-paasible:
       port: 80
       host: whoami.example.com
-    networks:
-      - traefik
-
-networks:
-  traefik:
-    external: true
 ```
 
 **3. Write your playbook:**
@@ -187,7 +181,7 @@ ansible-playbook -i inventory playbooks/deploy.yml
 ansible-playbook -i inventory playbooks/deploy.yml -l myhost
 
 # Force recreate all stacks
-ansible-playbook -i inventory playbooks/deploy.yml -e stack_recreate=always
+ansible-playbook -i inventory playbooks/deploy.yml -e paasible_stack_recreate=always
 
 # Dry run
 ansible-playbook -i inventory playbooks/deploy.yml --check

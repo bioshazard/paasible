@@ -8,6 +8,31 @@
   register: paasible_markers
   failed_when: false
 
+- name: Compute remaining stack marker paths
+  ansible.builtin.set_fact:
+    _remaining_marker_paths: >-
+      {{
+        paasible_stacks.keys()
+        | map('regex_replace', '^(.+)$', paasible_stacks_root ~ '/\1/.paasible-stack')
+        | list
+      }}
+  when: paasible_markers.files | length > 0
+
+- name: Slurp markers for removed stacks (capture ext nets before directory removal)
+  ansible.builtin.slurp:
+    src: "{{ item }}"
+  loop: >-
+    {{
+      paasible_markers.files
+      | map(attribute='path')
+      | reject('search', '/traefik/')
+      | list
+      | difference(_remaining_marker_paths | default([]))
+    }}
+  register: _removed_stack_marker_slurps
+  when: paasible_markers.files | length > 0
+  failed_when: false
+
 - name: Stop removed stacks
   community.docker.docker_compose_v2:
     project_src: "{{ item | dirname }}"
@@ -39,67 +64,43 @@
     - paasible_markers.files | length > 0
     - (item | dirname | basename) not in paasible_stacks.keys()
 
-- name: Ensure Traefik directories exist
-  ansible.builtin.file:
-    path: "{{ item }}"
-    state: directory
-    owner: root
-    group: root
-    mode: '0755'
-  loop:
-    - "{{ paasible_stacks_root }}/traefik"
-    - "{{ paasible_stacks_root }}/traefik/dynamic"
-  when: paasible_traefik_enabled | bool
+- name: Collect all networks to manage
+  ansible.builtin.set_fact:
+    _all_networks: >-
+      {{
+        (paasible_stacks.values()
+          | map(attribute='external_networks', default=[])
+          | flatten
+          | unique
+          | list)
+        +
+        (paasible_stacks.keys() | map('regex_replace', '$', '-net') | list)
+      }}
 
-- name: Template Traefik compose
-  ansible.builtin.template:
-    src: traefik-compose.yml.j2
-    dest: "{{ paasible_stacks_root }}/traefik/docker-compose.yml"
-    owner: root
-    group: root
-    mode: '0644'
-  when: paasible_traefik_enabled | bool
-
-- name: Write Traefik .env file
-  ansible.builtin.copy:
-    content: |
-      CF_DNS_API_TOKEN={{ paasible_traefik_cf_token }}
-    dest: "{{ paasible_stacks_root }}/traefik/.env"
-    owner: root
-    group: root
-    mode: '0600'
-  when: paasible_traefik_enabled | bool
-
-- name: Sync Traefik static config
-  ansible.builtin.template:
-    src: traefik.yml.j2
-    dest: "{{ paasible_stacks_root }}/traefik/traefik.yml"
-    mode: '0644'
-  when: paasible_traefik_enabled | bool
-
-- name: Deploy Traefik stack
-  community.docker.docker_compose_v2:
-    project_src: "{{ paasible_stacks_root }}/traefik"
-    files:
-      - docker-compose.yml
+- name: Create managed networks
+  community.docker.docker_network:
+    name: "{{ item }}"
+    driver: bridge
     state: present
-    recreate: "{{ paasible_stack_recreate | default('auto') }}"
-    pull: missing
-  when: paasible_traefik_enabled | bool
-
-- name: Ensure stack directory exists
-  ansible.builtin.file:
-    path: "{{ paasible_stacks_root }}/{{ item.key }}"
-    state: directory
-    owner: root
-    group: root
-    mode: '0755'
-  loop: "{{ paasible_stacks | dict2items }}"
+  loop: "{{ _all_networks }}"
   when: paasible_stacks | length > 0
+
+- name: Compute previous stack network names (for cleanup)
+  ansible.builtin.set_fact:
+    _previous_stack_nets: >-
+      {{
+        paasible_markers.files
+        | map(attribute='path')
+        | map('dirname')
+        | map('basename')
+        | map('regex_replace', '$', '-net')
+        | list
+      }}
+  when: paasible_markers.files | length > 0
 
 - name: Copy user stack compose
   ansible.builtin.copy:
-    src: "{{ paasible_stacks_dir }}/{{ item.key }}/docker-compose.yml"
+    src: "{{ paasible_stacks_dir }}/{{ item.value.template | default(item.key) }}/docker-compose.yml"
     dest: "{{ paasible_stacks_root }}/{{ item.key }}/docker-compose.yml"
     owner: root
     group: root
@@ -107,7 +108,7 @@
   loop: "{{ paasible_stacks | dict2items }}"
   when: paasible_stacks | length > 0
 
-- name: Generate Traefik labels overlay
+- name: Generate stack overlay (networks + routing)
   ansible.builtin.template:
     src: labels.yml.j2
     dest: "{{ paasible_stacks_root }}/{{ item.key }}/labels.yml"
@@ -115,7 +116,7 @@
   vars:
     stack_name: "{{ item.key }}"
     stack: "{{ item.value }}"
-    stack_dir: "{{ paasible_stacks_dir }}/{{ item.key }}"
+    stack_dir: "{{ paasible_stacks_dir }}/{{ item.value.template | default(item.key) }}"
   loop: "{{ paasible_stacks | dict2items }}"
   when: paasible_stacks | length > 0
 
@@ -149,7 +150,126 @@
 - name: Write stack marker
   ansible.builtin.copy:
     dest: "{{ paasible_stacks_root }}/{{ item.key }}/.paasible-stack"
-    content: "{{ item.key }}"
+    content: >-
+      {{
+        {
+          'stack': item.key,
+          'external_networks': item.value.external_networks | default([])
+        } | to_json
+      }}
     mode: '0644'
   loop: "{{ paasible_stacks | dict2items }}"
   when: paasible_stacks | length > 0
+
+- name: Deploy Traefik
+  block:
+    - name: Render Traefik static config
+      ansible.builtin.template:
+        src: traefik.yml.j2
+        dest: "{{ paasible_stacks_root }}/traefik/traefik.yml"
+        mode: '0644'
+
+    - name: Render Traefik compose
+      ansible.builtin.template:
+        src: traefik-compose.yml.j2
+        dest: "{{ paasible_stacks_root }}/traefik/docker-compose.yml"
+        mode: '0644'
+
+    - name: Ensure Traefik dynamic directory exists
+      ansible.builtin.file:
+        path: "{{ paasible_stacks_root }}/traefik/dynamic"
+        state: directory
+        mode: '0755'
+
+    - name: Deploy Traefik stack
+      community.docker.docker_compose_v2:
+        project_src: "{{ paasible_stacks_root }}/traefik"
+        state: present
+        recreate: auto
+      environment:
+        CF_DNS_API_TOKEN: "{{ paasible_traefik_cf_token }}"
+  when: paasible_traefik_enabled | bool and paasible_stacks | length > 0
+
+- name: Remove orphaned networks (stacks that were removed)
+  community.docker.docker_network:
+    name: "{{ item }}"
+    state: absent
+  loop: "{{ _previous_stack_nets | difference(_all_networks) }}"
+  when:
+    - paasible_markers.files | length > 0
+    - (_previous_stack_nets | difference(_all_networks)) | length > 0
+
+- name: Compute orphaned external networks from removed stacks
+  ansible.builtin.set_fact:
+    _orphaned_ext_nets: >-
+      {{
+        (_removed_stack_marker_slurps.results | default([])
+          | selectattr('content', 'defined')
+          | map(attribute='content')
+          | map('b64decode')
+          | map('regex_replace', '^(?!\{).*$', '{}')
+          | map('from_json')
+          | map(attribute='external_networks', default=[])
+          | flatten | unique | list)
+        | difference(
+            paasible_stacks.values()
+            | map(attribute='external_networks', default=[])
+            | flatten | unique | list
+          )
+      }}
+  when: _removed_stack_marker_slurps is defined
+
+- name: Remove orphaned external networks
+  community.docker.docker_network:
+    name: "{{ item }}"
+    state: absent
+  loop: "{{ _orphaned_ext_nets | default([]) }}"
+  when: (_orphaned_ext_nets | default([])) | length > 0
+
+- name: Compute networks to remove (from markers) when all stacks removed
+  ansible.builtin.set_fact:
+    _networks_to_remove: >-
+      {{
+        paasible_markers.files
+        | map(attribute='path')
+        | map('dirname')
+        | map('basename')
+        | map('regex_replace', '$', '-net')
+        | list
+      }}
+  when: paasible_stacks | length == 0
+
+- name: Stop Traefik before network teardown
+  community.docker.docker_compose_v2:
+    project_src: "{{ paasible_stacks_root }}/traefik"
+    state: absent
+  when:
+    - paasible_stacks | length == 0
+    - paasible_traefik_enabled | bool
+
+- name: Remove managed networks when all stacks removed
+  community.docker.docker_network:
+    name: "{{ item }}"
+    state: absent
+  loop: "{{ _networks_to_remove | default([]) }}"
+  when: paasible_stacks | length == 0
+
+- name: Ensure Traefik is disabled
+  block:
+    - name: Check if Traefik directory exists
+      ansible.builtin.stat:
+        path: "{{ paasible_stacks_root }}/traefik"
+      register: traefik_dir
+
+    - name: Stop Traefik stack
+      community.docker.docker_compose_v2:
+        project_src: "{{ paasible_stacks_root }}/traefik"
+        state: absent
+      when: traefik_dir.stat.exists
+
+    - name: Remove Traefik directory
+      ansible.builtin.file:
+        path: "{{ paasible_stacks_root }}/traefik"
+        state: absent
+      when: traefik_dir.stat.exists
+  when: not (paasible_traefik_enabled | bool)

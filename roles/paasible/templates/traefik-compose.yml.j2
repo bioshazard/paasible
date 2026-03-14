@@ -1,3 +1,6 @@
+{# This template loops over paasible_stacks.keys() to join stack networks.
+   When stacks are added/removed, the file content changes. The docker_compose
+   task uses recreate: auto so Traefik will be recreated when this file changes. #}
 services:
   traefik:
     image: "traefik:{{ paasible_traefik_version }}"
@@ -7,6 +10,9 @@ services:
       - no-new-privileges:true
     networks:
       - traefik
+{% for stack_key in paasible_stacks.keys() %}
+      - {{ stack_key }}-net
+{% endfor %}
     ports:
       - "80:80"
       - "443:443"
@@ -30,6 +36,10 @@ networks:
   traefik:
     name: traefik
     driver: bridge
+{% for stack_key in paasible_stacks.keys() %}
+  {{ stack_key }}-net:
+    external: true
+{% endfor %}
 
 volumes:
   traefik-certs:

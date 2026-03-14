@@ -4,9 +4,3 @@ services:
     x-paasible:
       port: 80
       host: whoami.example.com
-    networks:
-      - traefik
-
-networks:
-  traefik:
-    external: true
