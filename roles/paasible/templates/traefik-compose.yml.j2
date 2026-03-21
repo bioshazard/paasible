@@ -10,7 +10,7 @@ services:
       - no-new-privileges:true
     networks:
       - traefik
-{% for stack_key in paasible_stacks | dict2items | rejectattr('value.skip_net', 'defined') | map(attribute='key') %}
+{% for stack_key in paasible_stacks | dict2items | selectattr('value.skip_net', 'undefined') | map(attribute='key') %}
        - {{ stack_key }}-net
 {% endfor %}
     ports:
@@ -36,7 +36,7 @@ networks:
   traefik:
     name: traefik
     driver: bridge
-{% for stack_key in paasible_stacks | dict2items | rejectattr('value.skip_net', 'defined') | map(attribute='key') %}
+{% for stack_key in paasible_stacks | dict2items | selectattr('value.skip_net', 'undefined') | map(attribute='key') %}
   {{ stack_key }}-net:
     external: true
 {% endfor %}

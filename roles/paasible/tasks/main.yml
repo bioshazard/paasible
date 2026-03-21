@@ -75,7 +75,7 @@
           | list)
         +
         (paasible_stacks | dict2items
-          | rejectattr('value.skip_net', 'defined')
+          | selectattr('value.skip_net', 'undefined')
           | map(attribute='key')
           | map('regex_replace', '$', '-net')
           | list)
