@@ -8,8 +8,8 @@ services:
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
-     networks:
-       - traefik
+    networks:
+      - traefik
 {% for stack_key in paasible_stacks | dict2items | rejectattr('value.skip_net', 'defined') | map(attribute='key') %}
        - {{ stack_key }}-net
 {% endfor %}
