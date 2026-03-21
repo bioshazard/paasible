@@ -11,7 +11,7 @@ services:
     networks:
       - traefik
 {% for stack_key in paasible_stacks | dict2items | selectattr('value.skip_net', 'undefined') | map(attribute='key') %}
-       - {{ stack_key }}-net
+      - {{ stack_key }}-net
 {% endfor %}
     ports:
       - "80:80"
