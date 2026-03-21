@@ -8,10 +8,10 @@ services:
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
-    networks:
-      - traefik
-{% for stack_key in paasible_stacks.keys() %}
-      - {{ stack_key }}-net
+     networks:
+       - traefik
+{% for stack_key in paasible_stacks | dict2items | rejectattr('value.skip_net', 'defined') | map(attribute='key') %}
+       - {{ stack_key }}-net
 {% endfor %}
     ports:
       - "80:80"
@@ -36,7 +36,7 @@ networks:
   traefik:
     name: traefik
     driver: bridge
-{% for stack_key in paasible_stacks.keys() %}
+{% for stack_key in paasible_stacks | dict2items | rejectattr('value.skip_net', 'defined') | map(attribute='key') %}
   {{ stack_key }}-net:
     external: true
 {% endfor %}

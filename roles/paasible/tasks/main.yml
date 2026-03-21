@@ -74,7 +74,11 @@
           | unique
           | list)
         +
-        (paasible_stacks.keys() | map('regex_replace', '$', '-net') | list)
+        (paasible_stacks | dict2items
+          | rejectattr('value.skip_net', 'defined')
+          | map(attribute='key')
+          | map('regex_replace', '$', '-net')
+          | list)
       }}
 
 - name: Create managed networks
@@ -97,6 +101,16 @@
         | list
       }}
   when: paasible_markers.files | length > 0
+
+- name: Ensure destination directory exists
+  ansible.builtin.file:
+    path: "{{ paasible_stacks_root }}/{{ item.key }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  loop: "{{ paasible_stacks | dict2items }}"
+  when: paasible_stacks | length > 0
 
 - name: Copy user stack compose
   ansible.builtin.copy:
