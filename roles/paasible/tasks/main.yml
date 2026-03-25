@@ -156,6 +156,7 @@
     state: present
     recreate: "{{ paasible_stack_recreate | default('auto') }}"
     pull: missing
+    remove_orphans: true
   loop: "{{ paasible_stacks | dict2items }}"
   when: paasible_stacks | length > 0
   tags:

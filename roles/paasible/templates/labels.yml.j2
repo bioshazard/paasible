@@ -33,6 +33,9 @@ services:
       - "traefik.http.routers.{{ r }}.tls.certresolver={{ paasible_tls_resolver }}"
       - "traefik.http.services.{{ r }}.loadbalancer.server.port={{ route.port }}"
 {% endfor %}
+{% for label in p.extra_labels | default([]) %}
+      - "{{ label }}"
+{% endfor %}
 {% else %}
   {{ svc_name }}:
 {% if svc.network_mode is undefined %}

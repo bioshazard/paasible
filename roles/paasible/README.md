@@ -103,6 +103,27 @@ services:
     #       host: whoami.example.com
 ```
 
+#### Extra Labels
+
+For TCP routing or custom Traefik labels not covered by `routes`:
+
+```yaml
+services:
+  forgejo:
+    image: codeberg.org/forgejo/forgejo:10
+    x-paasible:
+      routes:
+        - port: 3000
+          subdomain: git
+      extra_labels:
+        - "traefik.tcp.routers.forgejo-ssh.entrypoints=ssh"
+        - "traefik.tcp.routers.forgejo-ssh.rule=HostSNI(`*`)"
+        - "traefik.tcp.routers.forgejo-ssh.service=forgejo-ssh@docker"
+        - "traefik.tcp.services.forgejo-ssh.loadbalancer.server.port=22"
+```
+
+Note: TCP entrypoints (e.g., `ssh`) must be defined in Traefik config separately.
+
 ## Example Playbook
 
 ```yaml
