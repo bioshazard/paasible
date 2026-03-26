@@ -112,13 +112,17 @@
   loop: "{{ paasible_stacks | dict2items }}"
   when: paasible_stacks | length > 0
 
-- name: Copy user stack compose
-  ansible.builtin.copy:
-    src: "{{ paasible_stacks_dir }}/{{ item.value.template | default(item.key) }}/docker-compose.yml"
-    dest: "{{ paasible_stacks_root }}/{{ item.key }}/docker-compose.yml"
-    owner: root
-    group: root
-    mode: '0644'
+- name: Sync user stack directory
+  ansible.builtin.synchronize:
+    src: "{{ paasible_stacks_dir }}/{{ item.value.template | default(item.key) }}/"
+    dest: "{{ paasible_stacks_root }}/{{ item.key }}/"
+    delete: true
+    recursive: true
+    rsync_opts:
+      - "--exclude=.env"
+      - "--exclude=*.sqlite3"
+      - "--exclude=.gitkeep"
+      - "--exclude=labels.yml"
   loop: "{{ paasible_stacks | dict2items }}"
   when: paasible_stacks | length > 0
 
