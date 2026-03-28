@@ -1,0 +1,6 @@
+- name: "Render files for {{ stack_entry.key }}"
+  ansible.builtin.copy:
+    content: "{{ item.value }}"
+    dest: "{{ paasible_stacks_root }}/{{ stack_entry.key }}/{{ item.key }}"
+    mode: '0600'
+  loop: "{{ stack_entry.value.files | default({}) | dict2items }}"

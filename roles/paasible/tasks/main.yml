@@ -112,19 +112,48 @@
   loop: "{{ paasible_stacks | dict2items }}"
   when: paasible_stacks | length > 0
 
+- name: Compute stack file excludes
+  ansible.builtin.set_fact:
+    _stacks_with_excludes: >-
+      {{
+        _stacks_with_excludes | default({})
+        | combine({
+          item.key: (
+            (item.value.files_exclude | default([]))
+            +
+            (item.value.files | default({}) | list)
+          )
+        })
+      }}
+  loop: "{{ paasible_stacks | dict2items }}"
+  when: (item.value.files is defined and item.value.files | length > 0) or (item.value.files_exclude is defined and item.value.files_exclude | length > 0)
+
 - name: Sync user stack directory
   ansible.builtin.synchronize:
     src: "{{ paasible_stacks_dir }}/{{ item.value.template | default(item.key) }}/"
     dest: "{{ paasible_stacks_root }}/{{ item.key }}/"
     delete: true
     recursive: true
-    rsync_opts:
-      - "--exclude=.env"
-      - "--exclude=*.sqlite3"
-      - "--exclude=.gitkeep"
-      - "--exclude=labels.yml"
+    rsync_opts: >-
+      {{
+        [
+          "--exclude=.env",
+          "--exclude=*.sqlite3",
+          "--exclude=.gitkeep",
+          "--exclude=labels.yml"
+        ]
+        +
+        (_stacks_with_excludes | default({})).get(item.key, []) | map('regex_replace', '^', '--exclude=') | list
+      }}
   loop: "{{ paasible_stacks | dict2items }}"
   when: paasible_stacks | length > 0
+
+- name: Render stack files
+  ansible.builtin.include_tasks: render_stack_files.yml
+  loop: "{{ paasible_stacks | dict2items }}"
+  loop_control:
+    loop_var: stack_entry
+  when: stack_entry.value.files is defined and stack_entry.value.files | length > 0
 
 - name: Generate stack overlay (networks + routing)
   ansible.builtin.template:
