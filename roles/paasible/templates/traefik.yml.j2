@@ -13,6 +13,10 @@ entryPoints:
           permanent: true
   websecure:
     address: ":443"
+{% for item in paasible_entrypoints | dict2items %}
+  {{ item.key }}:
+    address: ":{{ item.value['port'] }}"
+{% endfor %}
 
 providers:
   docker:

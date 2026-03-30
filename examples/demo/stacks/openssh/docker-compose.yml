@@ -1,0 +1,15 @@
+services:
+  openssh-server:
+    image: lscr.io/linuxserver/openssh-server:latest
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+      - PASSWORD_ACCESS=true
+      - USER_PASSWORD=password
+      - USER_NAME=linuxserver
+    volumes:
+      - ./config:/config
+    x-paasible:
+      port: 2222
+      tcp_entrypoint: ssh

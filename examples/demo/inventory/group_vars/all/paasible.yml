@@ -1,3 +1,8 @@
 paasible_subdomain_root: example.com
 paasible_tls_resolver: cloudflare
 paasible_acme_email: admin@example.com
+
+paasible_entrypoints:
+  ssh:
+    port: 2222
+    protocol: tcp
