@@ -3,4 +3,4 @@ services:
     image: traefik/whoami:latest
     x-paasible:
       port: 80
-      host: whoami.localhost
+      subdomain: whoami

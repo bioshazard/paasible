@@ -1,0 +1,27 @@
+ansible_host: 127.0.0.1
+ansible_user: root
+ansible_connection: local
+
+paasible_subdomain_root: localhost
+
+paasible_entrypoints:
+  ssh:
+    protocol: tcp
+    port: 2222
+
+paasible_stacks:
+  whoami:
+    env: {}
+  minio:
+    env:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_SERVER_URL: "https://minio.localhost"
+      MINIO_BROWSER_REDIRECT_URL: "https://minio-console.localhost"
+  forgejo:
+    env:
+      FORGEJO_DB_PASSWORD: forgejo_db_password_placeholder
+      FORGEJO__server__ROOT_URL: "https://git.localhost"
+      FORGEJO__server__SSH_DOMAIN: git.localhost
+      FORGEJO__server__SSH_PORT: 2222
+      FORGEJO__server__SSH_LISTEN_PORT: 2222

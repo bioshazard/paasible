@@ -211,6 +211,12 @@
 
 - name: Deploy Traefik
   block:
+    - name: Ensure Traefik directory exists
+      ansible.builtin.file:
+        path: "{{ paasible_stacks_root }}/traefik"
+        state: directory
+        mode: '0755'
+
     - name: Render Traefik static config
       ansible.builtin.template:
         src: traefik.yml.j2
