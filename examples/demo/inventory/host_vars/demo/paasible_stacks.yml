@@ -1,0 +1,18 @@
+ansible_host: 127.0.0.1
+ansible_user: root
+ansible_connection: local
+
+paasible_stacks:
+  whoami:
+    env: {}
+  openssh:
+    env: {}
+  auth:
+    env:
+      LLDAP_JWT_SECRET: "{{ lljwt_secret }}"
+      LLDAP_KEY_SEED: "{{ llkey_seed }}"
+      LLDAP_ADMIN_PASSWORD: "{{ lldap_admin_password }}"
+      SESSION_SECRET: "{{ session_secret }}"
+      STORAGE_ENCRYPTION_KEY: "{{ storage_encryption_key }}"
+      JWT_SECRET: "{{ jwt_secret }}"
+      IDENTITY_VALIDATION_JWT_SECRET: "{{ identity_validation_jwt_secret }}"

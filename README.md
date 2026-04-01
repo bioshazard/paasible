@@ -143,6 +143,45 @@ services:
 | `port` | integer | Single route shorthand |
 | `host` | string | FQDN, defaults to `{service}.{subdomain_root}` |
 | `routes` | list | Multiple routes, each with `port` and optional `host` |
+| `tcp_entrypoint` | string | TCP entrypoint name for passthrough (e.g., `ssh`) |
+| `extra_labels` | list | Additional Traefik labels |
+
+### TCP Passthrough
+
+For TCP services like SSH, define an entrypoint in `group_vars/all/paasible.yml`:
+
+```yaml
+paasible_entrypoints:
+  ssh:
+    port: 2222
+    protocol: tcp       # required — controls port binding in traefik-compose
+    host: "0.0.0.0"    # optional, defaults to 0.0.0.0
+```
+
+Then reference it in your stack's `docker-compose.yml`:
+
+```yaml
+services:
+  openssh-server:
+    image: lscr.io/linuxserver/openssh-server:latest
+    x-paasible:
+      port: 2222
+      tcp_entrypoint: ssh
+```
+
+Services can have both HTTP routes and TCP entrypoints (e.g., Gitea with web UI + SSH):
+
+```yaml
+services:
+  forgejo:
+    image: codeberg.org/forgejo/forgejo:10
+    x-paasible:
+      routes:
+        - port: 3000
+          subdomain: git
+      tcp_entrypoint: ssh
+      port: 22
+```
 
 ---
 

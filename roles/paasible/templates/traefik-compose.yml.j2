@@ -17,6 +17,11 @@ services:
       - "80:80"
       - "443:443"
       - "127.0.0.1:8080:8080"
+{% for item in paasible_entrypoints | dict2items %}
+{% if item.value['protocol'] == 'tcp' and item.value['port'] is defined %}
+      - "{{ item.value['host'] | default('0.0.0.0') }}:{{ item.value['port'] }}:{{ item.value['port'] }}"
+{% endif %}
+{% endfor %}
     environment:
       - CF_DNS_API_TOKEN
     volumes:

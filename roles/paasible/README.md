@@ -34,6 +34,7 @@ ansible-galaxy role install --force -p ./roles ./roles/paasible
 | `paasible_traefik_dashboard_host` | `traefik.{{ paasible_subdomain_root }}` | Traefik dashboard host |
 | `paasible_traefik_cf_token` | `""` | Cloudflare DNS API token |
 | `paasible_traefik_cf_email` | `""` | Cloudflare account email |
+| `paasible_entrypoints` | `{}` | Dict of TCP entrypoints (see below) |
 
 ### Workloads (host_vars/myhost/paasible_stacks.yml)
 
@@ -103,9 +104,50 @@ services:
     #       host: whoami.example.com
 ```
 
+#### TCP Passthrough
+
+For TCP services like SSH, use `tcp_entrypoint` to automatically generate Traefik TCP labels:
+
+```yaml
+services:
+  openssh-server:
+    image: lscr.io/linuxserver/openssh-server:latest
+    x-paasible:
+      port: 2222
+      tcp_entrypoint: ssh
+```
+
+**Required configuration** in `group_vars/all/paasible.yml`:
+
+```yaml
+paasible_entrypoints:
+  ssh:
+    port: 2222
+    protocol: tcp       # required — controls port binding in traefik-compose
+    host: "0.0.0.0"    # optional, defaults to 0.0.0.0
+```
+
+This generates entrypoints in `traefik.yml`, port bindings in `traefik-compose.yml`, and TCP router/service labels in the stack overlay.
+
+#### Combined HTTP + TCP
+
+Services can have both HTTP routes and TCP entrypoints (e.g., Gitea with web UI + SSH):
+
+```yaml
+services:
+  forgejo:
+    image: codeberg.org/forgejo/forgejo:10
+    x-paasible:
+      routes:
+        - port: 3000
+          subdomain: git
+      tcp_entrypoint: ssh
+      port: 22
+```
+
 #### Extra Labels
 
-For TCP routing or custom Traefik labels not covered by `routes`:
+For custom Traefik labels not covered by `routes` or `tcp_entrypoint`:
 
 ```yaml
 services:
@@ -121,8 +163,6 @@ services:
         - "traefik.tcp.routers.forgejo-ssh.service=forgejo-ssh@docker"
         - "traefik.tcp.services.forgejo-ssh.loadbalancer.server.port=22"
 ```
-
-Note: TCP entrypoints (e.g., `ssh`) must be defined in Traefik config separately.
 
 ## Example Playbook
 

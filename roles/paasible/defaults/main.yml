@@ -8,4 +8,12 @@ paasible_traefik_dashboard_host: "traefik.{{ paasible_subdomain_root }}"
 paasible_traefik_cf_token: ""
 paasible_traefik_version: "v3.6.6"
 
+paasible_entrypoints: {}
+# Example TCP entrypoint:
+# paasible_entrypoints:
+#   ssh:
+#     port: 2222
+#     protocol: tcp       # required — controls port binding in traefik-compose
+#     host: "0.0.0.0"    # optional, defaults to 0.0.0.0
+
 paasible_stacks: {}

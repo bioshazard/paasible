@@ -23,6 +23,7 @@ services:
 {% if svc.network_mode is undefined %}
       - "traefik.docker.network={{ stack_name }}-net"
 {% endif %}
+{% if p.routes is defined or p.tcp_entrypoint is not defined %}
 {% for route in routes %}
 {% set host = route.host | default(route.subdomain ~ '.' ~ paasible_subdomain_root if route.subdomain is defined else svc_name ~ '.' ~ paasible_subdomain_root) %}
 {% set r = stack_name ~ '-' ~ svc_name ~ '-' ~ route.port %}
@@ -33,6 +34,15 @@ services:
       - "traefik.http.routers.{{ r }}.tls.certresolver={{ paasible_tls_resolver }}"
       - "traefik.http.services.{{ r }}.loadbalancer.server.port={{ route.port }}"
 {% endfor %}
+{% endif %}
+{% if p.tcp_entrypoint is defined and p.tcp_entrypoint in paasible_entrypoints %}
+{% set tcp_ep = p.tcp_entrypoint %}
+{% set tcp_r = stack_name ~ '-' ~ svc_name ~ '-' ~ tcp_ep %}
+      - "traefik.tcp.routers.{{ tcp_r }}.entrypoints={{ tcp_ep }}"
+      - "traefik.tcp.routers.{{ tcp_r }}.rule=HostSNI(`*`)"
+      - "traefik.tcp.routers.{{ tcp_r }}.service={{ tcp_r }}@docker"
+      - "traefik.tcp.services.{{ tcp_r }}.loadbalancer.server.port={{ p.port if p.port is defined else p.routes[0].port }}"
+{% endif %}
 {% for label in p.extra_labels | default([]) %}
       - "{{ label }}"
 {% endfor %}
